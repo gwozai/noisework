@@ -286,9 +286,34 @@ document.addEventListener('DOMContentLoaded', function() {
         const GITHUB_REPO_REG = /<a href="https:\/\/github\.com\/([\w-]+)\/([\w.-]+)(?:\/[^\s"]*)?"[^>]*>(?!<img)[\s\S]*?<\/a>/g;
 
         // 处理标签（在 Markdown 解析后）
-        content = content.replace(/<p>(.*?)<\/p>/g, (match, p) => {
-            return '<p>' + p.replace(/#([^\s#<>]+)/g, '<span class="tag" onclick="filterByTag(\'$1\')">#$1</span>') + '</p>';
+        // 使用DOM方式处理，避免正则嵌套问题
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = content;
+        
+        // 遍历所有文本节点，替换#标签
+        const walker = document.createTreeWalker(tempDiv, NodeFilter.SHOW_TEXT, null, false);
+        const nodesToReplace = [];
+        let node;
+        while (node = walker.nextNode()) {
+            const text = node.textContent;
+            if (text.match(/#[^\s#]+/)) {
+                nodesToReplace.push(node);
+            }
+        }
+        
+        nodesToReplace.forEach(textNode => {
+            const text = textNode.textContent;
+            const newText = text.replace(/#([\u4e00-\u9fff\w]+)/g, function(match, tag) {
+                return '<span class="tag" onclick="filterByTag(\'' + tag + '\')">#' + tag + '</span>';
+            });
+            if (newText !== text) {
+                const span = document.createElement('span');
+                span.innerHTML = newText;
+                textNode.parentNode.replaceChild(span, textNode);
+            }
         });
+        
+        content = tempDiv.innerHTML;
 
         // 处理各种媒体链接
         content = content
